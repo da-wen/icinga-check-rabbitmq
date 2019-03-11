@@ -7,7 +7,8 @@ This is a learning repo for simple icinga checks in golang.
 ```
 
 ## Todo 
-* doc param overview
+* doc command overview (max)
+* doc param overview for max
 * min command
 * whitelist queues
 * implement vhost filter or direct asking for a vhost
