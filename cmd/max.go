@@ -30,8 +30,15 @@ import (
 var url, index, field, auth string
 var ecode, period, cTimeout int
 var treshold int64
+var qw, vhosts []string
 
-// countCmd represents the mincount command
+type ResultJSON []struct {
+	Name     string `json:"name"`
+	Messages int64  `json:"messages"`
+	Vhost    string `json:"vhost"`
+}
+
+// maxCmd represents the max command
 var maxCmd = &cobra.Command{
 	Use:   "max",
 	Short: "Checks if max messages treshold is reached",
@@ -47,9 +54,12 @@ func init() {
 	// required flags
 	maxCmd.Flags().StringVar(&url, "url", "", "string of url like http://localhost:15672")
 	maxCmd.MarkFlagRequired("url")
+	//optional
 	maxCmd.Flags().Int64VarP(&treshold, "max", "m", 1000, "defines minimum amount of docs that are required when command fails")
 	maxCmd.Flags().IntVarP(&ecode, "exit", "e", 2, "exit code to be used for fail")
 	maxCmd.Flags().StringVarP(&auth, "auth", "a", "", "basic auth for header authenticatio. format=username:password")
+	maxCmd.Flags().StringSliceVarP(&qw, "whitelist", "w", nil, "comma-separated  whitlist for queue")
+	maxCmd.Flags().StringSliceVarP(&vhosts, "vhosts", "v", nil, "comma-separated  whitlist for vhosts")
 }
 
 func logExit(m string, err error) {
@@ -100,16 +110,15 @@ func run() {
 		logExit(fmt.Sprintf("Response code invalid: %s", res.Status), nil)
 	}
 
-	type ResultJSON []struct {
-		Name     string `json:"name"`
-		Messages int64  `json:"messages"`
-	}
 	var result ResultJSON
 	json.Unmarshal(body, &result)
+	//fmt.Printf("%+v", string(body))
+	fmt.Printf("%+v", result)
+	result = filterVhost(&vhosts, result)
 
 	var failed []string
 	for _, queue := range result {
-		if queue.Messages >= treshold {
+		if contains(&qw, queue.Name) && queue.Messages >= treshold {
 			failed = append(failed, queue.Name)
 		}
 	}
@@ -120,4 +129,34 @@ func run() {
 	}
 
 	fmt.Printf("OK Queues under threshold  [%d] | queues=%d", treshold, len(result))
+}
+
+func filterVhost(allowed *[]string, list ResultJSON) ResultJSON {
+	if len(*allowed) == 0 {
+		return list
+	}
+
+	f := list[:0]
+	for _, a := range *allowed {
+		for _, l := range list {
+			if a == l.Vhost {
+				f = append(f, l)
+			}
+		}
+	}
+	return f
+}
+
+func contains(list *[]string, name string) bool {
+	if len(*list) == 0 {
+		return true
+	}
+
+	for _, n := range *list {
+		if name == n {
+			return true
+		}
+	}
+
+	return false
 }
