@@ -42,7 +42,7 @@ type ResultJSON []struct {
 var maxCmd = &cobra.Command{
 	Use:   "max",
 	Short: "Checks if max messages treshold is reached",
-	Long: `Fails with exit code 2 , if doc count for a period is higher then defined treshold
+	Long: `Fails with exit code 2 , if a queue is higher then defined treshold
 `,
 	Run: func(cmd *cobra.Command, args []string) {
 		run()
