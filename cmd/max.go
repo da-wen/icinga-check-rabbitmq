@@ -57,7 +57,7 @@ func init() {
 	//optional
 	maxCmd.Flags().Int64VarP(&treshold, "max", "m", 1000, "defines minimum amount of docs that are required when command fails")
 	maxCmd.Flags().IntVarP(&ecode, "exit", "e", 2, "exit code to be used for fail")
-	maxCmd.Flags().StringVarP(&auth, "auth", "a", "", "basic auth for header authenticatio. format=username:password")
+	maxCmd.Flags().StringVarP(&auth, "auth", "a", "", "basic auth for header authentication. format=username:password")
 	maxCmd.Flags().StringSliceVarP(&qw, "whitelist", "w", nil, "comma-separated  whitlist for queue")
 	maxCmd.Flags().StringSliceVarP(&vhosts, "vhosts", "v", nil, "comma-separated  whitlist for vhosts")
 }
@@ -112,25 +112,48 @@ func run() {
 
 	var result ResultJSON
 	json.Unmarshal(body, &result)
-	//fmt.Printf("%+v", string(body))
-	fmt.Printf("%+v", result)
 	result = filterVhost(&vhosts, result)
+	result = filterQueue(&qw, result)
 
 	var failed []string
 	for _, queue := range result {
-		if contains(&qw, queue.Name) && queue.Messages >= treshold {
+		if queue.Messages >= treshold {
 			failed = append(failed, queue.Name)
 		}
 	}
 
 	if len(failed) > 0 {
-		fmt.Printf("Critical Queues ["+strings.Join(failed, ",")+"] over threshold [%d] | queues=%d", treshold, len(failed))
+		fmt.Printf("Critical Queues ["+strings.Join(failed, ",")+"] over threshold [%d] | %s", treshold, strings.Join(generateKeyValueStrings(&result), " "))
 		os.Exit(ecode)
 	}
 
-	fmt.Printf("OK Queues under threshold  [%d] | queues=%d", treshold, len(result))
+	fmt.Printf("OK Queues under threshold [%d] | %s", treshold, strings.Join(generateKeyValueStrings(&result), " "))
 }
 
+func generateKeyValueStrings(list *ResultJSON) []string {
+	var data []string
+	for _, msg := range *list {
+		data = append(data, fmt.Sprintf("%s=%d", msg.Name, msg.Messages))
+	}
+
+	return data
+}
+
+func filterQueue(allowed *[]string, list ResultJSON) ResultJSON {
+	if len(*allowed) == 0 {
+		return list
+	}
+
+	f := list[:0]
+	for _, a := range *allowed {
+		for _, l := range list {
+			if a == l.Name {
+				f = append(f, l)
+			}
+		}
+	}
+	return f
+}
 func filterVhost(allowed *[]string, list ResultJSON) ResultJSON {
 	if len(*allowed) == 0 {
 		return list
@@ -145,18 +168,4 @@ func filterVhost(allowed *[]string, list ResultJSON) ResultJSON {
 		}
 	}
 	return f
-}
-
-func contains(list *[]string, name string) bool {
-	if len(*list) == 0 {
-		return true
-	}
-
-	for _, n := range *list {
-		if name == n {
-			return true
-		}
-	}
-
-	return false
 }
